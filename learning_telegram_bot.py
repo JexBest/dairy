@@ -1,5 +1,5 @@
 from telegram import Update
-from telegram.ext import Application, CommandHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, CallbackContext, filters, MessageHandler
 import logging
 from config import TELEGRAM_BOT_TOKEN
 from telegram import ReplyKeyboardMarkup
@@ -50,7 +50,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help))
     app.add_handler(CommandHandler("info", info))
-    app.add_handler(CommandHandler("", handle_text))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     # Запуск бота
     app.run_polling()
