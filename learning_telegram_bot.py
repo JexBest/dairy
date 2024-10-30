@@ -1,5 +1,5 @@
 from email.policy import default
-
+from database.models import filter_diary_by_date
 from httpx import request
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton
 from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters
@@ -41,8 +41,16 @@ async def about_command(update: Update, context: CallbackContext):
     )
 
 
+async def view_entries_command(update: Update, context: CallbackContext):
+    telegram_id = update.message.from_user.id
+    context.user_data['waiting_for_data'] = False
+    await update.message.reply_text("Введите дату в формате 'ГГГГ-ММ-ДД' для поиска записей")
+    if context.user_data.get('waiting_for_data'):
+        date = context.user_data['waiting_for_data']
+        filter_diary_by_date(telegram_id, date)
 
-#dwadasdasd
+
+
 
 async def contact_handler(update: Update, context: CallbackContext):
     contact = update.message.contact
@@ -81,7 +89,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(MessageHandler(filters.Text("Информация о пользователе"), info_command))
-    # Обработчик для кнопки "О программе"
+    app.add_handler(MessageHandler(filters.Text("Посмотреть записи"), view_entries_command))
     app.add_handler(MessageHandler(filters.Text("О программе"), about_command))
     app.add_handler(MessageHandler(filters.CONTACT, contact_handler))
     # Обработчик для любых текстовых сообщений
