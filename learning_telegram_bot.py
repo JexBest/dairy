@@ -1,56 +1,91 @@
-from telegram import Update
-from telegram.ext import Application, CommandHandler, CallbackContext, filters, MessageHandler
-import logging
+from email.policy import default
+
+from httpx import request
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton
+from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters
 from config import TELEGRAM_BOT_TOKEN
-from telegram import ReplyKeyboardMarkup
+
 # Включаем логирование
+import logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-
-
-
-
-async def start(update: Update, context: CallbackContext):
-    user = update.effective_user
-    keyboard = [['/start', '/help', '/info']]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text(
-        f"Привет, {user.first_name}! Выберите команду:", reply_markup=reply_markup
-    )
-
+logger = logging.getLogger(__name__)
 
 # Функция для обработки команды /start
 async def start(update: Update, context: CallbackContext):
-    user = update.effective_user  # получаем информацию о пользователе
-    await update.message.reply_text(f"Привет, {user.first_name}! Это базовый бот. Отправь команду /help для подсказок.")
+    user = update.effective_user  # Получаем информацию о пользователе
 
+    # Удаляем старую клавиатуру, если она есть
+    await update.message.reply_text("Обновляем меню...", reply_markup=ReplyKeyboardRemove())
 
-async def info(update: Update, context: CallbackContext):
-    user = update.effective_user
+    # Создаем новую клавиатуру с командами
+    keyboard = [
+        ["Добавить запись", "Посмотреть записи"],
+        ["Изменить запись", "Удалить запись"],
+        ["О программе", "Информация о пользователе"],
+        [KeyboardButton("Поделиться контактом", request_contact=True)]
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    # Отправляем сообщение с приветствием и новой клавиатурой
     await update.message.reply_text(
-        f"Информация о вас:\n"
-        f"Имя: {user.first_name}\n"
-        f"Фамилия: {user.first_name or 'Не указана.'}\n"
-        f"Telegram ID {user.id}"
+        f"Привет, {user.first_name}! Это базовый бот. Выберите команду или отправьте текст.",
+        reply_markup=reply_markup
+    )
+
+async def about_command(update: Update, context: CallbackContext):
+    await update.message.reply_text(
+        "Привет, это твой помощник, который поможет тебе в следующем:\n"
+        "Сохранить фото в личное хранилище\n"
+        "Вести свой дневник, либо ставить напоминание о событиях\n"
+        "Ты можешь в любой момент отредактировать любую свою запись или время\n"
+        "Мы всегда рядом, если у тебя будут предложения об улучшении, обязательно пиши о них нам!"
     )
 
 
-async  def help(update: Update, context: CallbackContext):
-    user = update.message.from_user.id
-    await  update.message.reply_text(f"Привет, это твой Telegramm ID: {user}! Пока больше ни чем помочь не могу")
 
-async def handle_text(update: Update, context: CallbackContext):
-    await update.message.reply_text("Я пока понимаю только команды. Отправь /help для списка команд.")
+
+
+async def contact_handler(update: Update, context: CallbackContext):
+    contact = update.message.contact
+    context.user_data['phone_number'] = contact.phone_number
+    await update.message.reply_text(
+        f"Спасибо за предоставленную информацию {contact.phone_number}"
+    )
+# Обработчик команды /help
+async def help_command(update: Update, context: CallbackContext):
+    await update.message.reply_text("Это команда /help. Выберите команду из меню или отправьте текст.")
+
+# Обработчик команды /info
+async def info_command(update: Update, context: CallbackContext):
+    user = update.effective_user
+
+    # Извлекаем имя, фамилию, ID и телефон (если он доступен)
+    first_name = user.first_name
+    last_name = user.last_name or "Нет фамилии!"
+    user_id = user.id
+    phone_number = context.user_data.get('phone_number', "Телефон не указан")
+
+    await update.message.reply_text(
+        f"Твое имя: {first_name}\n"
+        f"Твоя фамилия: {last_name}\n"
+        f"Твой аккаунт ID: {user_id}\n"
+        f"Твой телефон: {phone_number}"
+    )
+
 
 # Основная функция для запуска бота
 def main():
     # Создаем приложение
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-    # Обработчик для команды /start
+    # Обработчики команд
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help))
-    app.add_handler(CommandHandler("info", info))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(MessageHandler(filters.Text("Информация о пользователе"), info_command))
+    # Обработчик для кнопки "О программе"
+    app.add_handler(MessageHandler(filters.Text("О программе"), about_command))
+    app.add_handler(MessageHandler(filters.CONTACT, contact_handler))
+    # Обработчик для любых текстовых сообщений
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, help_command))
 
     # Запуск бота
     app.run_polling()
