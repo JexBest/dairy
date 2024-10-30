@@ -42,7 +42,7 @@ async def about_command(update: Update, context: CallbackContext):
 
 
 
-
+#dwadasdasd
 
 async def contact_handler(update: Update, context: CallbackContext):
     contact = update.message.contact
@@ -71,7 +71,7 @@ async def info_command(update: Update, context: CallbackContext):
         f"Твой телефон: {phone_number}"
     )
 
-
+#dsd
 # Основная функция для запуска бота
 def main():
     # Создаем приложение
