@@ -1,5 +1,5 @@
 import calendar
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from database.models import filter_diary_by_date, filter_diary_by_date_range
 from httpx import request
@@ -21,34 +21,63 @@ async  def show_calendar(update: Update, context: CallbackContext):
 
 
 def generate_calendar(year, month):
-    cal = calendar.monthcalendar(year, month)
+    days_in_month = (datetime(year, month + 1, 1) - timedelta(days=1)).day
     keyboard = []
-    for week in cal:
-        row = []
-        for day in week:
-            if day == 0:
-                row.append(InlineKeyboardButton(" ", callback_data="ignore"))
-            else:
-                row.append(InlineKeyboardButton(str(day), callback_data=f"calendar-day-{day}"))
-        keyboard.append(row)
-    navigation = [
-        InlineKeyboardButton("<", callback_data="calendar-prev"),
-        InlineKeyboardButton(">", callback_data="calendar-next")
-    ]
-    keyboard.append(navigation)
+
+    for day in range(1, days_in_month + 1):
+        button = InlineKeyboardButton(
+            text=str(day),
+            callback_data=f"{state}_{year}-{month:02d}-{day:02d}"
+        )
+        keyboard.append([button])
+
     return keyboard
 
+async def date_selected_callback(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data.split('_')
+    state = data[0]
+    selected_date = data[1]
+
+    if state == "start_day":
+        context.user_data["start_day"] = selected_date
+        await query.message.reply_text(f"Начальная дата выбрана: {selected_date}. Теперь выберите конечную дату.")
+        await show_calendar(update, context, state = "end_date")
+
+    elif state == "end_date":
+        context.user_data["end_date"] = selected_date
+        await query.message.reply_text(f"Конечная дата выбрана: {selected_date}. Выполняю поиск…")
+        await perform_date_range_search(update, context)
+
+async def perform_date_range_search(update: Update, context: CallbackContext):
+    telegram_id = update.message.from_user.id
+    start_date = context.user_data["start_date"]
+    end_date = context.user_data["end_date"]
+
+    entries = filter_diary_by_date_range(telegram_id, start_date, end_date)
+    if entries:
+        for entry in entries:
+            await update.message.reply_text(f"Запись: {entry}")
+    else:
+        await update.message.reply_text(f"Записей за период с {start_date} по {end_date} не найдено.")
+
+
 async def show_calendar (update, context, year = None, month = None):
-    if year is None or month is None:
-        now = datetime.now()
-        year = now.year
-        month = now.month
+    year = datetime.now().year
+    month = datetime.now().month
     keyboard = generate_calendar(year, month)
 
     await update.message.reply_text(
         f"Выберете дату:",
-        reply_markup=InlineKeyboardButton(keyboard)
+        reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
+async def view_entries_start_date(update: Update, context: CallbackContext):
+    # Запрашиваем начальную дату
+    context.user_data['waiting_for_start_date'] = True
+    await update.message.reply_text("Введите стартовую дату в формате 'ГГГГ-ММ-ДД' для поиска записей")
 
 
 async def calendar_callback (update: Update, context: CallbackContext):
@@ -87,6 +116,7 @@ async def calendar_callback (update: Update, context: CallbackContext):
 
 
 START_DATE, END_DATE = range(2)
+CHOOSE_START_DATE, CHOOSE_END_DATE = range(2)
 # Функция для обработки команды /start
 async def start(update: Update, context: CallbackContext):
     user = update.effective_user  # Получаем информацию о пользователе
@@ -169,13 +199,13 @@ async def cancel(update: Update, context: CallbackContext):
     return ConversationHandler.END
 
 
-view_entries_handler = ConversationHandler(
-    entry_points = [MessageHandler(filters.Text("Просмотр записи за период"), start_date_handler)],
+conv_handler = ConversationHandler(
+    entry_points=[MessageHandler(filters.Text("Просмотр записи за период"), view_entries_start_date)],
     states={
-        START_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_end_date)],
-        END_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, display_results)],
+        CHOOSE_START_DATE: [CallbackQueryHandler(date_selected_callback)],
+        CHOOSE_END_DATE: [CallbackQueryHandler(date_selected_callback)],
     },
-    fallbacks=[MessageHandler(filters.Text("Отмена"), cancel)]
+    fallbacks=[]
 )
 
 async def view_entries_command(update: Update, context: CallbackContext):
@@ -233,11 +263,10 @@ def main():
     app.add_handler(CommandHandler("calendar", show_calendar))
     app.add_handler(CallbackQueryHandler(calendar_callback))
     #app.add_handler(MessageHandler(filters.Text("Просмотр записей за период"), view_entries_handler))
-    app.add_handler(view_entries_handler)
     # Указываем обработчик для текстовых сообщений с проверкой флагов
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_result))
 
-
+    app.add_handler(conv_handler)
     # Контактный обработчик
     app.add_handler(MessageHandler(filters.CONTACT, contact_handler))
 
