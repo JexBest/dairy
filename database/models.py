@@ -199,17 +199,18 @@ def filter_diary_by_date_range (telegram_id, date_start, date_end):
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM diary_entries WHERE telegram_id = ? AND DATE(date) BETWEEN DATE(?) AND DATE(?)", (telegram_id, date_start, date_end))
             entries = cursor.fetchall()
+            result = []
             if entries:
-                print("\nВаши записи:")
                 for entry in entries:
-                    print(f"ID записи: {entry[0]}, Дата: {entry[2]}, Запись: {entry[3]}")
-                    print(f"Запомните ваш ID {entry[0]} записи, если захотите изменить запись или удалить ее!")
+                    result.append(f"ID:{entry[0]}, Дата: {entry[2]}, Запись: {entry[3]}")
+                return result
             else:
                 print("Записей за указанный период не найдено.")
         except sqlite3.Error as e:
             print(f"Произошла ошибка {e}")
         finally:
             conn.close()
+    return []
 
 
 def fetch_user_created_at(telegram_id):

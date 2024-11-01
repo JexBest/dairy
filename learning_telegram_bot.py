@@ -1,8 +1,10 @@
 from email.policy import default
+
+
 from database.models import filter_diary_by_date, filter_diary_by_date_range
 from httpx import request
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton
-from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters, ConversationHandler
 from config import TELEGRAM_BOT_TOKEN
 
 # Включаем логирование
@@ -24,7 +26,7 @@ async def start(update: Update, context: CallbackContext):
         ["Добавить запись", "Посмотреть записи"],
         ["Изменить запись", "Удалить запись"],
         ["О программе", "Информация о пользователе"],
-        ["Просмотр записей за период"],
+        ["Просмотр записи за период"],
         [KeyboardButton("Поделиться контактом", request_contact=True)]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -44,37 +46,64 @@ async def about_command(update: Update, context: CallbackContext):
     )
 
 
-async def view_entries_start_date(update: Update, context: CallbackContext):
-    # Запрашиваем начальную дату
-    context.user_data['waiting_for_start_date'] = True
-    await update.message.reply_text("Введите стартовую дату в формате 'ГГГГ-ММ-ДД' для поиска записей")
+async def start_date_handler (update: Update, context: CallbackContext):
 
-async def view_result(update: Update, context: CallbackContext):
-    # Проверяем, ожидаем ли начальную дату
-    if context.user_data.get('waiting_for_start_date'):
-        date_start = update.message.text
-        context.user_data['waiting_for_start_date'] = False  # Сбрасываем флаг начальной даты
-        context.user_data['waiting_for_end_date'] = True      # Устанавливаем флаг ожидания конечной даты
-        context.user_data['date_start'] = date_start          # Сохраняем начальную дату
-        await update.message.reply_text("Введите конечную дату в формате 'ГГГГ-ММ-ДД' для поиска записей")
+    await update.message.reply_text("Добавляем кнопочку 'отмена'...", reply_markup=ReplyKeyboardRemove())
+    keyboard = [
+        ["Отмена"],
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    reply_markup = reply_markup
+    await update.message.reply_text(
+        f"Введите начальную дату в формате 'ГГГГ-ММ-ДД' для поиска записей",
+        reply_markup=reply_markup
+    )
+    return START_DATE
 
-    # Проверяем, ожидаем ли конечную дату
-    elif context.user_data.get('waiting_for_end_date'):
-        date_end = update.message.text
-        date_start = context.user_data.get('date_start')      # Получаем сохраненную начальную дату
-        telegram_id = update.message.from_user.id
-        entries = filter_diary_by_date_range(telegram_id, date_start, date_end)
+async def  get_end_date(update: Update, context: CallbackContext):
+    context.user_data['start_date'] = update.message.text
+    await update.message.reply_text("Введите конечную дату в формате 'ГГГГ-ММ-ДД'")
+    return END_DATE
 
-        # Выводим найденные записи или сообщение об их отсутствии
-        if entries:
-            for entry in entries:
-                await update.message.reply_text(f"Запись: {entry}")
-        else:
-            await update.message.reply_text(f"За указанный период с {date_start} по {date_end} записей не найдено!")
 
-        # Сбрасываем флаг конечной даты после выполнения поиска
-        context.user_data['waiting_for_end_date'] = False
+async def display_results(update: Update, context: CallbackContext):
+    date_start = context.user_data['start_date']
+    date_end = update.message.text
+    telegram_id = update.message.from_user.id
+    entries = filter_diary_by_date_range(telegram_id, date_start, date_end)
+    if entries:
+        for entry in entries:
+            await update.message.reply_text(f"{entry}")
+    else:
+        await update.message.reply_text(f"Записей за период с {date_start} по {date_end} не найдено")
 
+    await update.message.reply_text("Обновляем меню...", reply_markup=ReplyKeyboardRemove())
+    keyboard = [
+        ["Добавить запись", "Посмотреть записи"],
+        ["Изменить запись", "Удалить запись"],
+        ["О программе", "Информация о пользователе"],
+        ["Просмотр записи за период"],
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text(
+        f"Меню обновлено!",
+        reply_markup=reply_markup
+    )
+    return ConversationHandler.END
+
+async def cancel(update: Update, context: CallbackContext):
+    await update.message.reply_text("Действие отменено.")
+    return ConversationHandler.END
+
+
+view_entries_handler = ConversationHandler(
+    entry_points = [MessageHandler(filters.Text("Просмотр записи за период"), start_date_handler)],
+    states={
+        START_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_end_date)],
+        END_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, display_results)],
+    },
+    fallbacks=[MessageHandler(filters.Text("Отмена"), cancel)]
+)
 
 async def view_entries_command(update: Update, context: CallbackContext):
     telegram_id = update.message.from_user.id
@@ -128,11 +157,11 @@ def main():
     app.add_handler(MessageHandler(filters.Text("О программе"), about_command))
     app.add_handler(MessageHandler(filters.Text("Информация о пользователе"), info_command))
     app.add_handler(MessageHandler(filters.Text("Посмотреть записи"), view_entries_command))
-    app.add_handler(MessageHandler(filters.Text("Просмотр записей за период"), view_entries_start_date))
-
+    #app.add_handler(MessageHandler(filters.Text("Просмотр записей за период"), view_entries_handler))
+    app.add_handler(view_entries_handler)
     # Указываем обработчик для текстовых сообщений с проверкой флагов
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, show_result))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, view_result))
+
 
     # Контактный обработчик
     app.add_handler(MessageHandler(filters.CONTACT, contact_handler))
