@@ -1,6 +1,4 @@
-from email.policy import default
-
-
+import calendar
 from database.models import filter_diary_by_date, filter_diary_by_date_range
 from httpx import request
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
@@ -13,10 +11,30 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 
+async  def show_calendar(update: Update, context: CallbackContext):
+    year = 2024
+    month = 10
+    calendar_keyboard = generate_calendar(year, month)
+    await update.message.reply_text("Выберете дату:", reply_markup=calendar_keyboard)
 
 
-
-
+def generate_calendar(year, month):
+    cal = calendar.monthcalendar(year, month)
+    keyboard = []
+    for week in cal:
+        row = []
+        for day in week:
+            if day == 0:
+                row.append(InlineKeyboardButton(" ", callback_data="ignore"))
+            else:
+                row.append(InlineKeyboardButton(str(day), callback_data=f"calendar-day-{day}"))
+        keyboard.append(row)
+    navigation = [
+        InlineKeyboardButton("<", callback_data="calendar-prev"),
+        InlineKeyboardButton(">", callback_data="calendar-next")
+    ]
+    keyboard.append(navigation)
+    return keyboard
 
 START_DATE, END_DATE = range(2)
 # Функция для обработки команды /start
