@@ -1,8 +1,10 @@
 import calendar
+from datetime import datetime
+
 from database.models import filter_diary_by_date, filter_diary_by_date_range
 from httpx import request
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters, ConversationHandler
+from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters, ConversationHandler, CallbackQueryHandler
 from config import TELEGRAM_BOT_TOKEN
 
 # Включаем логирование
@@ -35,6 +37,54 @@ def generate_calendar(year, month):
     ]
     keyboard.append(navigation)
     return keyboard
+
+async def show_calendar (update, context, year = None, month = None):
+    if year is None or month is None:
+        now = datetime.now()
+        year = now.year
+        month = now.month
+    keyboard = generate_calendar(year, month)
+
+    await update.message.reply_text(
+        f"Выберете дату:",
+        reply_markup=InlineKeyboardButton(keyboard)
+    )
+
+
+async def calendar_callback (update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data.split('_')
+    action = data[0]
+
+    year = int(data[1])
+    month = int(data[2])
+
+    if action == 'next':
+        month += 1
+        if month > 12:
+            month = 1
+            year = +1
+    if action == 'prev':
+        month -= 1
+        if month < 1:
+            month = 12
+            year -= 1
+
+    elif action == 'select':
+        await show_calendar(update, context, year, month)
+        return
+    elif action == 'confirm':
+        selected_date = data[3]
+        await query.message.reply_text(f"Вы выбрали дату {selected_date}")
+        return
+
+    keyboard = generate_calendar(year, month)
+    await query.edit_message_reply_markup(reply_markup=InlineKeyboardButton(keyboard))
+
+
+
 
 START_DATE, END_DATE = range(2)
 # Функция для обработки команды /start
@@ -180,6 +230,8 @@ def main():
     app.add_handler(MessageHandler(filters.Text("О программе"), about_command))
     app.add_handler(MessageHandler(filters.Text("Информация о пользователе"), info_command))
     app.add_handler(MessageHandler(filters.Text("Посмотреть записи"), view_entries_command))
+    app.add_handler(CommandHandler("calendar", show_calendar))
+    app.add_handler(CallbackQueryHandler(calendar_callback))
     #app.add_handler(MessageHandler(filters.Text("Просмотр записей за период"), view_entries_handler))
     app.add_handler(view_entries_handler)
     # Указываем обработчик для текстовых сообщений с проверкой флагов
