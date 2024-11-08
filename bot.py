@@ -16,7 +16,7 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
-
+w
 
 async def start (update: Update, context: CallbackContext):
     telegram_id = update.message.from_user.id
