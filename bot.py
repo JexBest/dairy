@@ -82,7 +82,8 @@ async def add_reminder(update: Update, context: CallbackContext):
     else:
         try:
             reminder_date = datetime.strptime(user_input, "%Y-%m-%d")
-            if reminder_date < datetime.now():
+            today = datetime.now().date()
+            if reminder_date.date() < today:
                 await update.message.reply_text(
                     "Напоминание не может быть установлено на прошедшую дату. Пожалуйста, введите корректную дату.")
                 return ADD_REMINDER
