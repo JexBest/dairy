@@ -125,47 +125,88 @@ def add_user(telegram_id, username, phone_number):
         finally:
             conn.close()
 
-def add_diary_entry (telegram_id, content, photo=None, reminder_time=None):
+
+def add_diary_entry(telegram_id, content, photo=None, reminder_time=None):
     conn = create_connection()
     if conn:
         try:
+            # Создаем путь для сохранения фотографии
             photo_path = generate_photo_path(telegram_id) if photo else None
+
+            # Сохраняем фото, если оно предоставлено
             if photo:
                 with open(photo_path, "wb") as file:
                     file.write(photo)
-            cursor = conn.cursor()
-            cursor.execute("SELECT created_at FROM users WHERE telegram_id = ?", (telegram_id,))
-            user_created_at = cursor.fetchone()
-            if user_created_at:
-                user_created_at = user_created_at[0]
-            else:
-                print("Пользователь не найден")
-                return None
 
-            # Добавление новой записи в дневник
+            # Добавление записи в таблицу diary_entries
             sql = "INSERT INTO diary_entries (telegram_id, content, photo_path, reminder_time) VALUES (?, ?, ?, ?)"
             cursor = conn.cursor()
-            cursor.execute(sql, (telegram_id, content, photo, reminder_time))
+            # Передаем photo_path, а не сам файл
+            cursor.execute(sql, (telegram_id, content, photo_path, reminder_time))
             entry_id = cursor.lastrowid
             conn.commit()
             print("Запись успешно добавлена")
 
-            # Логирование действия
+            # Логирование действия в таблицу audit_log
             add_audit_log(
                 telegram_id=telegram_id,
                 action="added_diary_entry",
-                user_created_at=user_created_at,
+                user_created_at=datetime.now(),
                 entry_created_at=datetime.now(),
                 new_content=content,
                 phone_number=None,
-                photo_path=photo_path,
-                reminder_time=reminder_time# Если номер не нужен
+                photo_path=photo_path,  # Путь сохраняется в логах
+                reminder_time=reminder_time  # Если напоминание не нужно, передаем None
             )
             return entry_id
+
         except sqlite3.Error as e:
             print(f"Произошла ошибка {e}")
+
         finally:
             conn.close()
+
+# def add_diary_entry (telegram_id, content, photo=None, reminder_time=None):
+#     conn = create_connection()
+#     if conn:
+#         try:
+#             photo_path = generate_photo_path(telegram_id) if photo else None
+#             if photo:
+#                 with open(photo_path, "wb") as file:
+#                     file.write(photo)
+#             cursor = conn.cursor()
+#             cursor.execute("SELECT created_at FROM users WHERE telegram_id = ?", (telegram_id,))
+#             user_created_at = cursor.fetchone()
+#             if user_created_at:
+#                 user_created_at = user_created_at[0]
+#             else:
+#                 print("Пользователь не найден")
+#                 return None
+#
+#             # Добавление новой записи в дневник
+#             sql = "INSERT INTO diary_entries (telegram_id, content, photo_path, reminder_time) VALUES (?, ?, ?, ?)"
+#             cursor = conn.cursor()
+#             cursor.execute(sql, (telegram_id, content, photo, reminder_time))
+#             entry_id = cursor.lastrowid
+#             conn.commit()
+#             print("Запись успешно добавлена")
+#
+#             # Логирование действия
+#             add_audit_log(
+#                 telegram_id=telegram_id,
+#                 action="added_diary_entry",
+#                 user_created_at=user_created_at,
+#                 entry_created_at=datetime.now(),
+#                 new_content=content,
+#                 phone_number=None,
+#                 photo_path=photo_path,
+#                 reminder_time=reminder_time# Если номер не нужен
+#             )
+#             return entry_id
+#         except sqlite3.Error as e:
+#             print(f"Произошла ошибка {e}")
+#         finally:
+#             conn.close()
 
 
 def filter_diary_by_date(telegram_id, date):
