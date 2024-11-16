@@ -2,6 +2,7 @@ import sqlite3
 from database.connection import create_connection
 
 
+
 conn = create_connection()
 if conn:
     try:
