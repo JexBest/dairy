@@ -238,15 +238,13 @@ def filter_diary_by_date(telegram_id, date):
 
             # Проверяем, есть ли записи
             if entries:
-                print("\nВаши записи:")
-                for entry in entries:
-                    print(f"ID записи: {entry[0]}, Дата: {entry[2]}, Запись: {entry[3]}")
-                    print(f"Запомните ваш ID {entry[0]} записи, если захотите изменить запись или удалить ее!")
+                return entries
             else:
-                print("Записей за указанную дату не найдено.")
+                return []
 
         except sqlite3.Error as e:
             print(f"Произошла ошибка {e}")
+            return None
         finally:
             conn.close()
 

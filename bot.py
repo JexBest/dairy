@@ -9,7 +9,8 @@ from config import LOG_FILE_PATH
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InputFile
 from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters, ConversationHandler
 from config import TELEGRAM_BOT_TOKEN
-from database.models import add_user, add_diary_entry, update_diary_entry, view_all_notes
+
+from database.models import add_user, add_diary_entry, update_diary_entry, view_all_notes, filter_diary_by_date
 from datetime import datetime
 
 
@@ -81,6 +82,61 @@ async def view_all_note(update: Update, context: CallbackContext):
                         await update.message.reply_photo(InputFile(photo))
                 except Exception as e:
                     await update.message.reply_text(f"Не удалось отправить фото: {e}")
+
+
+async def one_date_note (update: Update, context:CallbackContext):
+    await update.message.reply_text(
+        "За какую дату ищем запись?",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    keyboard = [
+        ["Назад", "Отмена"],
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text(
+        "Введите дату в формате ГГГГ-ММ-ДД, 'Назад' для возврата в предыдущее меню, либо 'Отмена' для возврата в главное меню",
+        reply_markup=reply_markup
+    )
+    return VIEW_ONE_DATE_NOTES
+
+async def view_one_date_note (update: Update, context: CallbackContext):
+    telegram_id = update.message.from_user.id
+    context.user_data['date_note'] = update.message.text
+    date = context.user_data['date_note']
+    await update.message.reply_text(
+        "Ищем ваши записи...",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    keyboard = [
+        ["Назад", "Отмена"],
+    ]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    await update.message.reply_text(
+        "По завершению просмотра нажмите 'Назад' для продолжение просмотра либо 'Отмена' для выхода в главное меню\nЕсли нужно будет изменить запись в будущем, запомните ее ID",
+        reply_markup=reply_markup
+    )
+    entries = filter_diary_by_date(telegram_id, date)
+    if entries is None:
+        await update.message.reply_text("Возникла ошибка при запросе записей.")
+    elif not entries:
+        await update.message.reply_text("Записи не найдены.")
+    else:
+        for entry in entries:
+            entry_id = entry[0]
+            date = entry[2]
+            content = entry[3]
+            photo_path = entry[4]
+            await update.message.reply_text(
+                f"ID: {entry_id}, Дата: {date}, Запись: {content}\n"
+            )
+            if photo_path and os.path.exists(photo_path):
+                try:
+                    with open(photo_path, 'rb') as photo:
+                        await update.message.reply_photo(InputFile(photo))
+                except Exception as e:
+                    await update.message.reply_text(f"Не удалось отправить фото: {e}")
+
+
 
 
 
@@ -324,8 +380,13 @@ def main():
             VIEW_NOTES: [
                 MessageHandler(filters.Text("Просмотр всех записей"), view_all_note),
                 MessageHandler(filters.Text("Назад"), view_note_start),
-                # MessageHandler(filters.Text("За дату"), view_one_date_note),
+                MessageHandler(filters.Text("За дату"), one_date_note),
                 # MessageHandler(filters.Text("За период"), view_range_date_note),
+                MessageHandler(filters.Text("Отмена"), cancel)
+            ],
+            VIEW_ONE_DATE_NOTES: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, view_one_date_note),
+                MessageHandler(filters.Text("Назад"), view_note_start),
                 MessageHandler(filters.Text("Отмена"), cancel)
             ],
         },
