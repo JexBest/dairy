@@ -135,7 +135,7 @@ async def view_one_date_note (update: Update, context: CallbackContext):
                         await update.message.reply_photo(InputFile(photo))
                 except Exception as e:
                     await update.message.reply_text(f"Не удалось отправить фото: {e}")
-
+    return VIEW_NOTES
 
 
 
@@ -385,9 +385,10 @@ def main():
                 MessageHandler(filters.Text("Отмена"), cancel)
             ],
             VIEW_ONE_DATE_NOTES: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, view_one_date_note),
                 MessageHandler(filters.Text("Назад"), view_note_start),
-                MessageHandler(filters.Text("Отмена"), cancel)
+                MessageHandler(filters.Text("Отмена"), cancel),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, view_one_date_note)
+
             ],
         },
         fallbacks=[MessageHandler(filters.Regex("^Отмена$"), cancel)]  # Обработка "Отмена" как fallback
