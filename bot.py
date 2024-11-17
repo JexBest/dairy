@@ -9,8 +9,9 @@ from config import LOG_FILE_PATH
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters, ConversationHandler
 from config import TELEGRAM_BOT_TOKEN
-from database.models import add_user, add_diary_entry
+from database.models import add_user, add_diary_entry, update_diary_entry, view_all_notes
 from datetime import datetime
+
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -23,6 +24,54 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 ADD_TEXT, ADD_PHOTO, ADD_REMINDER = range(3)
+
+VIEW_NOTES, VIEW_ALL_NOTES, VIEW_ONE_DATE_NOTES, VIEW_RANGE_DATE_NOTES = range(4)
+
+
+async def view_note_start(update: Update, context: CallbackContext):
+    await update.message.reply_text(
+        "Давай поищем твои записи",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    keyboard = [
+        ["Просмотр всех записей"],
+        ["За дату", "За период"],
+        ["Отмена"],
+    ]
+    reply_markup = ReplyKeyboardMarkup (keyboard, resize_keyboard=True)
+    await update.message.reply_text(
+        "Выбери действие как будем искать, или 'отмена' для выхода в главное меню",
+        reply_markup = reply_markup
+    )
+    return VIEW_NOTES
+
+
+
+async def view_all_note(update: Update, context: CallbackContext):
+    telegram_id = update.message.from_user.id
+
+    await update.message.reply_text(
+        "Ищем ваши записи...",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    keyboard = [
+        ["Назад", "Отмена"],
+    ]
+    reply_markup = ReplyKeyboardMarkup (keyboard, resize_keyboard=True)
+    await update.message.reply_text(
+        "По завершению просмотра нажмите 'Назад' для продолжение просмотра либо 'Отмена' для выхода в главное меню",
+        reply_markup = reply_markup
+    )
+    try:
+        view_notes = view_all_notes(telegram_id)
+        print("view_notes")
+        if view_notes:
+            for i in view_notes:
+                print(f"{i}")
+    except ValueError as e:
+        await update.message.reply_text(f"Ошибка{e}")
+    return VIEW_ALL_NOTES
+
 
 async def add_note_start(update: Update, context: CallbackContext):
     await update.message.reply_text(
@@ -258,6 +307,20 @@ def main():
         },
         fallbacks=[MessageHandler(filters.Regex("^Отмена$"), cancel)]  # Обработка "Отмена" как fallback
     )
+    view_conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Text("Просмотр записей"), view_note_start)],
+        states={
+            VIEW_NOTES: [
+                MessageHandler(filters.Text("Просмотр всех записей"), view_all_note),
+                # MessageHandler(filters.Text("За дату"), view_one_date_note),
+                # MessageHandler(filters.Text("За период"), view_range_date_note),
+                MessageHandler(filters.Text("Отмена"), cancel)
+            ],
+        },
+        fallbacks=[MessageHandler(filters.Regex("^Отмена$"), cancel)]  # Обработка "Отмена" как fallback
+    )
+
+
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
@@ -266,6 +329,7 @@ def main():
     # В main() добавляем новый обработчик
     app.add_handler(CommandHandler("cleanup", cleanup_command))
     app.add_handler(conv_handler)
+    app.add_handler(view_conv_handler)
     app.run_polling()
 
 if __name__ == "__main__":

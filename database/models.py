@@ -5,6 +5,7 @@ from config import generate_photo_path
 
 
 
+
 def create_tables():
     conn = create_connection()
     if conn:
@@ -207,6 +208,24 @@ def add_diary_entry(telegram_id, content, photo=None, reminder_time=None):
 #             print(f"Произошла ошибка {e}")
 #         finally:
 #             conn.close()
+
+def view_all_notes (telegram_id):
+    conn=create_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM diary_entries WHERE telegram_id = ?", (telegram_id))
+            entries = cursor.fetchall()
+            if entries:
+                for entry in entries:
+                    print(f"ID записи: {entry[0]}, Дата: {entry[2]}, Запись: {entry[3]}")
+                    print(f"Запомните ваш ID {entry[0]} записи, если захотите изменить запись или удалить ее!")
+            else:
+                print("Записи не найдены")
+        except sqlite3.Error as e:
+            print(f"Возникла ошибка {e}")
+        finally:
+            conn.close()
 
 
 def filter_diary_by_date(telegram_id, date):
