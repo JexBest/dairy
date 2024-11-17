@@ -6,7 +6,7 @@ from email.policy import default
 from multiprocessing.context import assert_spawning
 
 from config import LOG_FILE_PATH
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InputFile
 from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters, ConversationHandler
 from config import TELEGRAM_BOT_TOKEN
 from database.models import add_user, add_diary_entry, update_diary_entry, view_all_notes
@@ -49,7 +49,7 @@ async def view_note_start(update: Update, context: CallbackContext):
 
 async def view_all_note(update: Update, context: CallbackContext):
     telegram_id = update.message.from_user.id
-
+    entries = view_all_notes(telegram_id)
     await update.message.reply_text(
         "Ищем ваши записи...",
         reply_markup=ReplyKeyboardRemove()
@@ -59,18 +59,29 @@ async def view_all_note(update: Update, context: CallbackContext):
     ]
     reply_markup = ReplyKeyboardMarkup (keyboard, resize_keyboard=True)
     await update.message.reply_text(
-        "По завершению просмотра нажмите 'Назад' для продолжение просмотра либо 'Отмена' для выхода в главное меню",
+        "По завершению просмотра нажмите 'Назад' для продолжение просмотра либо 'Отмена' для выхода в главное меню\nЕсли нужно будет изменить запись в будущем, запомните ее ID",
         reply_markup = reply_markup
     )
-    try:
-        view_notes = view_all_notes(telegram_id)
-        print("view_notes")
-        if view_notes:
-            for i in view_notes:
-                print(f"{i}")
-    except ValueError as e:
-        await update.message.reply_text(f"Ошибка{e}")
-    return VIEW_ALL_NOTES
+    if entries is None:
+        await update.message.reply_text("Возникла ошибка при запросе записей.")
+    elif not entries:
+        await update.message.reply_text("Записи не найдены.")
+    else:
+        for entry in entries:
+            entry_id = entry[0]
+            date = entry[2]
+            content = entry[3]
+            photo_path = entry[4]
+            await update.message.reply_text(
+                f"ID: {entry_id}, Дата: {date}, Запись: {content}\n"
+            )
+            if photo_path and os.path.exists(photo_path):
+                try:
+                    with open(photo_path, 'rb') as photo:
+                        await update.message.reply_photo(InputFile(photo))
+                except Exception as e:
+                    await update.message.reply_text(f"Не удалось отправить фото: {e}")
+
 
 
 async def add_note_start(update: Update, context: CallbackContext):
@@ -312,6 +323,7 @@ def main():
         states={
             VIEW_NOTES: [
                 MessageHandler(filters.Text("Просмотр всех записей"), view_all_note),
+                MessageHandler(filters.Text("Назад"), view_note_start),
                 # MessageHandler(filters.Text("За дату"), view_one_date_note),
                 # MessageHandler(filters.Text("За период"), view_range_date_note),
                 MessageHandler(filters.Text("Отмена"), cancel)

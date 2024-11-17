@@ -214,16 +214,15 @@ def view_all_notes (telegram_id):
     if conn:
         try:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM diary_entries WHERE telegram_id = ?", (telegram_id))
+            cursor.execute("SELECT * FROM diary_entries WHERE telegram_id = ?", (telegram_id,))
             entries = cursor.fetchall()
             if entries:
-                for entry in entries:
-                    print(f"ID записи: {entry[0]}, Дата: {entry[2]}, Запись: {entry[3]}")
-                    print(f"Запомните ваш ID {entry[0]} записи, если захотите изменить запись или удалить ее!")
+                return entries
             else:
-                print("Записи не найдены")
+                return []
         except sqlite3.Error as e:
             print(f"Возникла ошибка {e}")
+            return None
         finally:
             conn.close()
 
