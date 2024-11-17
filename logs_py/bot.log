@@ -624,3 +624,7 @@ TypeError: tzinfo argument must be None or of a tzinfo subclass, not type 'int'
 2024-11-16 15:00:52,061 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7835013090:AAFfvl5iTih4qoXxBRh0wxTYjEQjChBr0Q8/getUpdates "HTTP/1.1 200 OK"
 2024-11-16 15:01:02,080 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7835013090:AAFfvl5iTih4qoXxBRh0wxTYjEQjChBr0Q8/getUpdates "HTTP/1.1 200 OK"
 2024-11-16 15:01:12,060 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7835013090:AAFfvl5iTih4qoXxBRh0wxTYjEQjChBr0Q8/getUpdates "HTTP/1.1 200 OK"
+2024-11-16 15:01:22,166 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7835013090:AAFfvl5iTih4qoXxBRh0wxTYjEQjChBr0Q8/getUpdates "HTTP/1.1 200 OK"
+2024-11-16 15:01:26,100 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7835013090:AAFfvl5iTih4qoXxBRh0wxTYjEQjChBr0Q8/getUpdates "HTTP/1.1 200 OK"
+2024-11-16 15:01:26,101 - telegram.ext.Application - INFO - Application is stopping. This might take a moment.
+2024-11-16 15:01:26,101 - telegram.ext.Application - INFO - Application.stop() complete
