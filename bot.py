@@ -188,7 +188,7 @@ async def add_photo(update: Update, context: CallbackContext):
         await update.message.reply_text("Фото не добавлено.")
 
     # Переходим к этапу добавления напоминания
-    await update.message.reply_text("Укажите дату напоминания в формате 'ГГГГ-ММ-ДД' или введите 'нет', чтобы пропустить.")
+    await update.message.reply_text("Укажите дату напоминания в формате 'ГГГГ-ММ-ДД ЧЧ:ММ', если не указать ЧЧ:ММ (часы:минуты), по умолчанию напоминание встанет на 12:00 или введите 'нет', чтобы пропустить.")
     return ADD_REMINDER
 
 async def add_reminder(update: Update, context: CallbackContext):
@@ -197,13 +197,19 @@ async def add_reminder(update: Update, context: CallbackContext):
         reminder_time = None
     else:
         try:
-            reminder_date = datetime.strptime(user_input, "%Y-%m-%d")
+            reminder_date = datetime.strptime(user_input, "%Y-%m-%d %H:%M")
+
             today = datetime.now().date()
             if reminder_date.date() < today:
                 await update.message.reply_text(
                     "Напоминание не может быть установлено на прошедшую дату. Пожалуйста, введите корректную дату.")
                 return ADD_REMINDER
-
+            else:
+                if " " in user_input:
+                    reminder_date = datetime.strptime(user_input, "%Y-%m-%d %H:%M")
+                else:
+                    reminder_date = datetime.strptime(user_input, "%Y-%m-%d")
+                    reminder_date = reminder_date.replace(hour=12, minute=0)
             context.user_data['reminder_time'] = reminder_date
             await update.message.reply_text(f"Напоминание установлено на {reminder_date.strftime('%Y-%m-%d')}.")
 
