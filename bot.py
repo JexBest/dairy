@@ -73,8 +73,9 @@ async def view_all_note(update: Update, context: CallbackContext):
             date = entry[2]
             content = entry[3]
             photo_path = entry[4]
+            reminder = entry[5]
             await update.message.reply_text(
-                f"ID: {entry_id}, Дата: {date}, Запись: {content}\n"
+                f"ID: {entry_id}, Дата: {date}, Запись: {content},\nНапоминание {reminder}\n"
             )
             if photo_path and os.path.exists(photo_path):
                 try:
@@ -126,8 +127,9 @@ async def view_one_date_note (update: Update, context: CallbackContext):
             date = entry[2]
             content = entry[3]
             photo_path = entry[4]
+            reminder = entry[5]
             await update.message.reply_text(
-                f"ID: {entry_id}, Дата: {date}, Запись: {content}\n"
+                f"ID: {entry_id}, Дата: {date}, Запись: {content}\nНапоминание: {reminder}\n"
             )
             if photo_path and os.path.exists(photo_path):
                 try:
@@ -197,27 +199,23 @@ async def add_reminder(update: Update, context: CallbackContext):
         reminder_time = None
     else:
         try:
-            reminder_date = datetime.strptime(user_input, "%Y-%m-%d %H:%M")
-
-            today = datetime.now().date()
-            if reminder_date.date() < today:
-                await update.message.reply_text(
-                    "Напоминание не может быть установлено на прошедшую дату. Пожалуйста, введите корректную дату.")
-                return ADD_REMINDER
-            else:
-                if " " in user_input:
-                    reminder_date = datetime.strptime(user_input, "%Y-%m-%d %H:%M")
-                else:
-                    reminder_date = datetime.strptime(user_input, "%Y-%m-%d")
-                    reminder_date = reminder_date.replace(hour=12, minute=0)
-            context.user_data['reminder_time'] = reminder_date
-            await update.message.reply_text(f"Напоминание установлено на {reminder_date.strftime('%Y-%m-%d')}.")
-
+            reminder_time = datetime.strptime(user_input, "%Y-%m-%d %H:%M")
         except ValueError:
+            try:
+                reminder_time = datetime.strptime(user_input, "%Y-%m-%d")
+                reminder_time = reminder_time.replace(hour=12, minute=0)
+            except ValueError:
+                await update.message.reply_text(
+                    "Некорректный формат даты. Пожалуйста, введите дату в формате 'ГГГГ-ММ-ДД' или введите 'нет', чтобы пропустить.")
+                return ADD_REMINDER
+        today = datetime.now()
+        if reminder_time < today:
             await update.message.reply_text(
-            "Некорректный формат даты. Пожалуйста, введите дату в формате 'ГГГГ-ММ-ДД' или введите 'нет', чтобы пропустить.")
-            return ADD_REMINDER  # Оставляем в текущем состоянии для повторного ввода
-        reminder_time = update.message.text
+                "Напоминание не может быть установлено на прошедшую дату и время. Пожалуйста, введите корректные данные."
+            )
+            return ADD_REMINDER
+ # Оставляем в текущем состоянии для повторного ввода
+        #reminder_time = update.message.text
     telegram_id = update.message.from_user.id
     content = context.user_data['note_text']
     photo_path = context.user_data.get('photo_path')
